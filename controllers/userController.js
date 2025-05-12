@@ -4,7 +4,7 @@ import pool from "../db.js";
 import jwt from "jsonwebtoken";
 import { cloudinary } from "../config/cloudinary.js";
 import { transporter } from "../config/email.js";
-
+import { generateToken } from "../middleware/generateToken.js";
 export const RegisterUser = async (req, res) => {
   const {
     firstname,
@@ -199,7 +199,6 @@ export const verifyEmail = async (req, res) => {
   console.log("req.body:", req.body);
   const { token } = req.body;
 
-
   if (!token) {
     return res.status(400).json({
       success: false,
@@ -245,5 +244,96 @@ export const verifyEmail = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Email verification failed" });
+  }
+};
+
+export const LoginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    console.log("reqbody:", req.body);
+
+    const user = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    console.log("user query result:", user);
+
+    if (user.rowCount === 0) {
+      console.log("User not found");
+      return res
+        .status(400)
+        .json({ success: false, message: "User does not exist!" });
+    }
+
+    const foundUser = user.rows[0];
+    console.log("Found user:", foundUser);
+
+    const VerifyToken = jwt.sign({ email }, process.env.EMAIL_SECRET, {
+      expiresIn: "1h",
+    });
+    console.log("VerifyToken:", VerifyToken);
+
+    const validatePassword = await bcrypt.compare(password, foundUser.password);
+    console.log("Password valid:", validatePassword);
+
+    if (!validatePassword) {
+      console.log("Invalid password");
+      return res
+        .status(400)
+        .json({ success: false, message: "Password is not correct" });
+    }
+
+    if (foundUser.verified !== true) {
+      console.log("User not verified, sending verification email");
+      await sendVerificationEmail(email, verificationLink, message);
+      return res.status(400).json({
+        success: false,
+        message: `You have not verified your account. A new verification link has been sent to ${email}.`,
+      });
+    }
+
+    res.clearCookie("auth_token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      path: "/",
+    });
+
+    const token = generateToken({
+      id: foundUser.id,
+      role: foundUser.role,
+      email: foundUser.email,
+      firstname: foundUser.firstname,
+      lastname: foundUser.lastname,
+      address: foundUser.address || "No Address Provided",
+      phone: foundUser.phone || "No Phone Provided",
+      image: foundUser.image,
+    });
+    console.log("Generated token:", token);
+
+    if (!token) {
+      console.log("Token generation failed");
+      return res.status(400).json({ success: false, message: "Invalid Token" });
+    }
+
+    // Don't use res.cookie() for React Native
+    // res.cookie("auth_token", token, {...});
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token, // ⬅️ Send token in response
+      user: {
+        id: foundUser.id,
+        email: foundUser.email,
+        firstname: foundUser.firstname,
+        lastname: foundUser.lastname,
+      },
+    });
+  } catch (error) {
+    console.error("LoginUser error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong, please try again later!",
+    });
   }
 };

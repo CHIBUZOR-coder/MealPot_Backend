@@ -1,5 +1,9 @@
 import express from "express";
-import { RegisterUser } from "../controllers/userController";
-const router = express.Router();
+import { RegisterUser, verifyEmail } from "../controllers/userController.js";
+import uploads from "../middleware/uploads.js";
+const userRouter = express.Router();
 
-router.post("/registerUser", RegisterUser);
+userRouter.post("/registerUser", uploads.single("image"), RegisterUser);
+userRouter.post("/verifyEmail", verifyEmail);
+
+export default userRouter;

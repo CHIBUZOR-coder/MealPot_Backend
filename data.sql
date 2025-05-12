@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
     phone TEXT NOT NULL,
     password TEXT NOT NULL,
     image TEXT DEFAULT NULL,
-    role role_enum NOT NULL DEFAULT 'user'
+    role role_enum NOT NULL DEFAULT 'user',
+   verified BOOLEAN DEFAULT FALSE
 );
 CREATE TABLE IF NOT EXISTS resturant(
     id SERIAL PRIMARY KEY,
@@ -47,4 +48,17 @@ CREATE TABLE IF NOT EXISTS reviews(
     userId INT,
     CONSTRAINT res_review FOREIGN KEY (resId) REFERENCES resturant (id) ON DELETE CASCADE,
     CONSTRAINT user_review FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+) CREATE TABLE IF NOT EXISTS category(
+    id SERIAL PRIMARY KEY,
+     name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    image TEXT DEFAULT NULL,
+)
+
+ CREATE TABLE IF NOT EXISTS category_link(
+    id SERIAL PRIMARY KEY,
+    res_Id INT NOT NULL,
+    category_Id INT NOT NULL,
+    CONSTRAINT res FOREIGN KEY (res_Id) REFERENCES resturant(id) ON DELETE CASCADE,
+    CONSTRAINT category FOREIGN KEY (category_Id) REFERENCES category(id) ON DELETE CASCADE
 )

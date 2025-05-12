@@ -3,11 +3,26 @@ import dotenv from "dotenv";
 import pool from "../db.js";
 import jwt from "jsonwebtoken";
 import { cloudinary } from "../config/cloudinary.js";
+import { transporter } from "../config/email.js";
 
 export const RegisterUser = async (req, res) => {
-  const { firstname, lastname, email, password, confimpassword, adress } =
-    req.body;
+  const {
+    firstname,
+    lastname,
+    email,
+    password,
+    confirmpassword,
+    adress,
+    owner,
+    phone,
+  } = req.body;
+
+  console.log("reqbody:", req.body);
+
   try {
+    const client = await pool.connect();
+
+    await client.query("BEGIN");
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -16,7 +31,7 @@ export const RegisterUser = async (req, res) => {
       });
     }
 
-    if (confimpassword !== password) {
+    if (confirmpassword !== password) {
       return res
         .status(400)
         .json({ success: false, message: "Password doe not match!" });
@@ -32,29 +47,57 @@ export const RegisterUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    let imageUrl;
-    if (req.file) {
-      imageUrl = await uploadImageToCloudinary(req.file.buffer);
-    }
     const existingUser = await pool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
 
-    if (existingUser.rowCount < 1) {
+    if (existingUser.rowCount > 0) {
       return res
         .status(400)
-        .json({ success: false, message: "User does not exist in database!" });
+        .json({ success: false, message: "User already exist in database!" });
+    }
+
+    let imageUrl;
+    const { image } = req.body;
+    if (image) {
+      imageUrl = await uploadImageToCloudinary(image);
+      console.log("Uploaded Image URL:", imageUrl);
     }
 
     const newUser = await pool.query(
-      "INSERT INTO TABLE user ( firstname, lastname, email, password, adress) VALUES(1$, $2, $3, $4, $5)  RETURNING *",
-      [firstname, lastname, email, hashedPassword, adress]
+      "INSERT INTO  users ( firstname, lastname, email, password, adress, phone, image, role) VALUES($1, $2, $3, $4, $5, $6, $7, $8)  RETURNING *",
+      [
+        firstname,
+        lastname,
+        email,
+        hashedPassword,
+        adress,
+        phone,
+        imageUrl,
+        owner === "true" ? "owner" : "user",
+      ]
     );
 
-    const verificationLink = `http://localhost:5173/verifyEmail?token=${verifyEmailToken}`;
+    // Generate email verification token
+    const verifyEmailToken = jwt.sign({ email }, process.env.EMAIL_SECRET, {
+      expiresIn: "1h",
+    });
+
+    const verificationLink = `http://localhost:8081/VerifyEmail?token=${verifyEmailToken}`;
     const message = "Click the link below to verify your account";
-    await sendVerificationEmail(email, verificationLink, message);
+
+    try {
+      await sendVerificationEmail(email, verificationLink, message);
+    } catch (error) {
+      console.log(error.message);
+      await client.query("ROLLBACK");
+      client.release();
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Unable to register user!",
+      });
+    }
 
     const userData = newUser.rows[0];
     delete userData.password; // Remove the password from the response
@@ -149,5 +192,58 @@ const sendVerificationEmail = async (email, verificationLink, message) => {
     console.log(`Verification email sent to ${email}`);
   } catch (error) {
     console.error(`Error sending email to ${email}:`, error);
+  }
+};
+
+export const verifyEmail = async (req, res) => {
+  console.log("req.body:", req.body);
+  const { token } = req.body;
+
+
+  if (!token) {
+    return res.status(400).json({
+      success: false,
+      message: "Token and email are required",
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.EMAIL_SECRET); // Use your JWT secret key
+
+    if (!decoded) {
+      return res.status(401).json({ success: false, message: "Invalid token" });
+    }
+    // Extract email
+    const { email } = decoded;
+
+    // const user = await prisma.user.findUnique({
+
+    const user = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    if (!user.rowCount === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Unable to find user" });
+    }
+
+    const update = await pool.query(
+      "UPDATE users SET verified = TRUE WHERE email = $1",
+      [email]
+    );
+    // If verification is successful, send a success response
+
+    if (update.rowCount > 0) {
+      return res.status(200).json({
+        success: true,
+        message: "Email verified successfully",
+        data: decoded, // Optionally send decoded data
+      });
+    }
+  } catch (error) {
+    console.error("Email verification error:", error.message);
+    return res
+      .status(500)
+      .json({ success: false, message: "Email verification failed" });
   }
 };

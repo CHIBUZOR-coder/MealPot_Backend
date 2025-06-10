@@ -56,6 +56,9 @@ export const RegisterUser = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "User already exist in database!" });
+    }else{
+      console.log("somthig went wong");
+      
     }
 
     let imageUrl;

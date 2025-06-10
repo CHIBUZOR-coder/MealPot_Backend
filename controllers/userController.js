@@ -79,6 +79,15 @@ export const RegisterUser = async (req, res) => {
       ]
     );
 
+    try {
+      if (!newUser.rows > 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Unable to register user" });
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
     // Generate email verification token
     const verifyEmailToken = jwt.sign({ email }, process.env.EMAIL_SECRET, {
       expiresIn: "1h",

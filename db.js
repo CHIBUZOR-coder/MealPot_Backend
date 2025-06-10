@@ -39,7 +39,7 @@ const pool = new pg.Pool({
 });
 
 // Test the database connection with try-catch
-const testDbConnection = async () => {
+const DbConnection = async () => {
   try {
     await pool.connect();
     console.log("Connected to the database successfully.");
@@ -49,7 +49,7 @@ const testDbConnection = async () => {
 };
 
 // Call the test function
-testDbConnection();
+DbConnection();
 
 // Default export
 

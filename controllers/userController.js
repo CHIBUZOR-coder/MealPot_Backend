@@ -66,7 +66,7 @@ export const RegisterUser = async (req, res) => {
     }
 
     const newUser = await pool.query(
-      "INSERT INTO  users ( firstname, lastname, email, password, adress, phone, image, role) VALUES($1, $2, $3, $4, $5, $6, $7, $8)  RETURNING *",
+      "INSERT INTO  public.users ( firstname, lastname, email, password, adress, phone, image, role) VALUES($1, $2, $3, $4, $5, $6, $7, $8)  RETURNING *",
       [
         firstname,
         lastname,

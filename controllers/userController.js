@@ -47,7 +47,7 @@ export const RegisterUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const Check = await pool.query("SELECT * FROM category WHERE ", [48]);
+    const Check = await pool.query("SELECT * FROM category ");
 
     console.log("category:", Check);
 

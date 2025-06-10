@@ -25,18 +25,17 @@
 // testDbConnection();
 // //default export
 // export default pool;
-
 import pg from "pg";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const pool = new pg.Pool({
-  user: "postgres",
-  password: process.env.DB_PASSWORD,
-  host: "localhost", // Change this if necessary
-  port: 5432,
-  database: "mealpot",
+  user: process.env.DB_USERNAME, // Use the username from the environment variable
+  password: process.env.DB_PASSWORD, // Ensure no quotes are included
+  host: process.env.DB_HOST, // Host from environment variable
+  port: process.env.DB_PORT, // Port from environment variable
+  database: process.env.DB_DATABASE, // Database name from environment variable
 });
 
 // Test the database connection with try-catch
@@ -54,6 +53,6 @@ const testDbConnection = async () => {
 // Call the test function
 testDbConnection();
 
-
 // Default export
+
 export default pool;

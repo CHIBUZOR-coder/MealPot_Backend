@@ -47,6 +47,10 @@ export const RegisterUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    const Check = await pool.query("SELECT * FROM category WHERE ", [48]);
+
+    console.log("category:", Check);
+
     const existingUser = await pool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
@@ -56,9 +60,8 @@ export const RegisterUser = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "User already exist in database!" });
-    }else{
+    } else {
       console.log("somthig went wong");
-      
     }
 
     let imageUrl;

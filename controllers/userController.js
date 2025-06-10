@@ -282,6 +282,9 @@ export const LoginUser = async (req, res) => {
         .json({ success: false, message: "Password is not correct" });
     }
 
+    const verificationLink = `http://localhost:8081/VerifyEmail?token=${VerifyToken}`;
+    const message = `A link has benn sent to ${email}`;
+
     if (foundUser.verified !== true) {
       console.log("User not verified, sending verification email");
       await sendVerificationEmail(email, verificationLink, message);
@@ -334,6 +337,51 @@ export const LoginUser = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Something went wrong, please try again later!",
+    });
+  }
+};
+
+export const AccountRecovery = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+
+    if (!user.rowCount > 1) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User does not exist in database" });
+    }
+
+    const recoveryToken = jwt.sign({ email }, process.env.EMAIL_SECRET, {
+      expiresIn: "10m",
+    });
+    const recoveryLink = `http://localhost:8081/RecoveryPage?token=${recoveryToken}`;
+
+    const message = `Clink on the link below to verify your account `;
+
+    try {
+      await sendVerificationEmail(email, recoveryLink, message);
+    } catch (error) {
+      console.log(error.message);
+      await client.query("ROLLBACK");
+      client.release();
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Unable to register user!",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `A verification link has been sent to ${email}`,
+    });
+  } catch (error) {
+    console.log("error:", error.message);
+    return res.status(400).json({
+      success: false,
+      message: "An error occured, please try agai later!",
     });
   }
 };
